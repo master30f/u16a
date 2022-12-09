@@ -1,0 +1,3 @@
+ - Two buses
+ - MASM buses syntax a,b -> c,d
+ - No need to write to arg source

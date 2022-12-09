@@ -1,0 +1,23 @@
+// @identifier  {NOP}
+// @description {No-op}
+// @static      {false}
+// @arguments   {0}
+0000_0000 {
+    ei
+}
+
+// @identifier  {JMP}
+// @description {Jumps to address in register $x}
+// @static      {false}
+// @arguments   {1}
+0000_0001 {
+    [word] {
+        ip -> addr
+        ram -> args
+        arg0 -> ip
+    }
+    [byte] {
+        // TODO: Throw some sort of error
+    }
+    ei
+}

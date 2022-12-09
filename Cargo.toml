@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "asm-u16a",
+    "masm",
+]
