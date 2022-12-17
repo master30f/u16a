@@ -1,0 +1,41 @@
+{
+  "name": "masm-language",
+  "publisher": "zorby",
+  "displayName": "MASM Language Support",
+  "description": "",
+  "version": "0.0.2",
+  "engines": {
+    "vscode": "^1.73.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "masm",
+        "aliases": [
+          "MASM",
+          "masm"
+        ],
+        "extensions": [
+          ".masm"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "masm",
+        "scopeName": "source.masm",
+        "path": "./syntaxes/masm.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "masm",
+        "path": "./snippets.json"
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{environment::{Token, Statement, ModeFlag, Mode, Action, Flag, WordSource, WordSink, ByteSource, ByteSink}, lexer::Lexer};
+use crate::{environment::{Token, Statement, ModeFlag, Mode, Action, Flag, WordSource, WordSink, ByteSource, ByteSink, FlagMap}, lexer::Lexer};
 
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
@@ -114,7 +114,7 @@ impl<'a> Parser<'a> {
         Ok(Statement::Definition { instruction, mode, statements })
     }
     
-    fn make_action_compound(&mut self, action: &mut Option<Action>, flags: &mut HashSet<Flag>) -> Result<(), String> {
+    fn make_action_compound(&mut self, action: &mut Option<Action>, flags: &mut Vec<Flag>) -> Result<(), String> {
         let token = self.current.clone().ok_or(String::from("Invalid syntax"))??;
         if let Token::Word(first) = token {
             match self.advance() {
@@ -142,7 +142,7 @@ impl<'a> Parser<'a> {
                     }
                 }
                 None | Some(Ok(Token::NewLine | Token::Ampersand)) => {
-                    flags.insert(Flag::try_from(first).map_err(|_| String::from("Invalid flag"))?);
+                    flags.push(Flag::try_from(first).map_err(|_| String::from("Invalid flag"))?);
                     Ok(())
                 }
                 Some(Err(error)) => Err(error),
@@ -158,16 +158,16 @@ impl<'a> Parser<'a> {
 
     fn make_action(&mut self) -> Result<Statement, String> {
         let mut action: Option<Action> = None;
-        let mut flags: HashSet<Flag> = HashSet::new();
+        let mut flags: Vec<Flag> = Vec::new();
 
         loop {
             self.make_action_compound(&mut action, &mut flags)?;
             //println!("In make_action loop\n Current: {:?}", &self.current);
             match &self.current {
-                Some(Ok(Token::NewLine)) | None => return Ok(Statement::Action(action, flags)),
+                Some(Ok(Token::NewLine)) | None => return Ok(Statement::Action(action, FlagMap::from(flags))),
                 Some(Ok(Token::Ampersand)) => { self.advance(); },
                 Some(Err(error)) => return Err(error.clone()),
-                token => {
+                _token => {
                     //println!("{:?}", token);
                     return Err(String::from("Invalid syntax"));
                 }

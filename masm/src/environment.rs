@@ -96,10 +96,32 @@ impl TryFrom<String> for ByteSink {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum Flag {
     IC,
     EI
+}
+
+#[derive(Debug, Clone)]
+pub struct FlagMap {
+    ic: bool,
+    ei: bool
+}
+
+impl From<Vec<Flag>> for FlagMap {
+    fn from(flags: Vec<Flag>) -> Self {
+        let mut ic = false;
+        let mut ei = false;
+
+        for flag in flags {
+            match flag {
+                Flag::IC => ic = true,
+                Flag::EI => ei = true
+            }
+        }
+
+        Self { ic, ei }
+    }
 }
 
 impl TryFrom<String> for Flag {
@@ -143,8 +165,8 @@ impl Mode {
         Self { byte: true, word: true }
     }
 
-    fn is_byte(&self) -> bool { self.byte }
-    fn is_word(&self) -> bool { self.word }
+    pub fn is_byte(&self) -> bool { self.byte }
+    pub fn is_word(&self) -> bool { self.word }
 }
 
 impl From<HashSet<ModeFlag>> for Mode {
@@ -171,7 +193,7 @@ pub enum Action {
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    Action(Option<Action>, HashSet<Flag>),
+    Action(Option<Action>, FlagMap),
     Definition {
         instruction: Option<u8>,
         mode: Mode,
