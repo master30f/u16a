@@ -20,7 +20,7 @@ fn make_micro_index(instruction_code: &u16, ptr: u8, alu_zero: bool) -> Result<u
         return Err(String::from("Pointer out of bounds"))
     }
 
-    Ok((instruction_code << 8) | ((ptr as u16) << 1) | (alu_zero as u16))
+    Ok((instruction_code << 4) | ((ptr as u16) << 1) | (alu_zero as u16))
 }
 
 fn action_to_microinstructions(stream: &Option<Stream>, flags: &Vec<Token>) -> u16 {
@@ -28,14 +28,14 @@ fn action_to_microinstructions(stream: &Option<Stream>, flags: &Vec<Token>) -> u
 
     for flag in flags {
         out |= match flag {
-            Token::ZX => 0b00_000_000_000001_00,
-            Token::NX => 0b00_000_000_000010_00,
-            Token::ZY => 0b00_000_000_000100_00,
-            Token::NY => 0b00_000_000_001000_00,
-            Token::F  => 0b00_000_000_010000_00,
-            Token::NO => 0b00_000_000_100000_00,
-            Token::IC => 0b01_000_000_000000_00,
-            Token::EI => 0b10_000_000_000000_00,
+            Token::ZX => 0b00_0000_0000_000001,
+            Token::NX => 0b00_0000_0000_000010,
+            Token::ZY => 0b00_0000_0000_000100,
+            Token::NY => 0b00_0000_0000_001000,
+            Token::F  => 0b00_0000_0000_010000,
+            Token::NO => 0b00_0000_0000_100000,
+            Token::IC => 0b01_0000_0000_000000,
+            Token::EI => 0b10_0000_0000_000000,
             _         => unreachable!()
         }
     }
@@ -46,19 +46,21 @@ fn action_to_microinstructions(stream: &Option<Stream>, flags: &Vec<Token>) -> u
             Token::IP  => 2,
             Token::RX  => 3,
             Token::RY  => 4,
-            Token::ALU => 5,
+            Token::RZ  => 5,
+            Token::ALU => 6,
             _          => unreachable!()
-        } << 8);
+        } << 6);
 
         out |= (match stream.to {
-            Token::ADDR => 1,
-            Token::INST => 2,
-            Token::IP   => 3,
-            Token::RX   => 4,
-            Token::RY   => 5,
-            Token::RAM  => 6,
+            Token::RAM  => 1,
+            Token::ADDR => 2,
+            Token::INST => 3,
+            Token::IP   => 4,
+            Token::RX   => 5,
+            Token::RY   => 6,
+            Token::RZ   => 7,
             _           => unreachable!()
-        } << 11);
+        } << 10);
     }
 
     return out;

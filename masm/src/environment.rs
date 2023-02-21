@@ -12,6 +12,7 @@ pub enum Token {
     IP,
     RX,
     RY,
+    RZ,
     ALU,
     ADDR,
     INST,
@@ -43,6 +44,7 @@ impl Token {
             "ip"   => Token::IP,
             "rx"   => Token::RX,
             "ry"   => Token::RY,
+            "rz"   => Token::RZ,
             "alu"  => Token::ALU,
             "addr" => Token::ADDR,
             "inst" => Token::INST,
@@ -59,6 +61,7 @@ impl Token {
             | Self::IP
             | Self::RX
             | Self::RY
+            | Self::RZ
             | Self::ALU => true,
             _ => false
         }
@@ -70,6 +73,7 @@ impl Token {
             | Self::IP
             | Self::RX
             | Self::RY
+            | Self::RZ
             | Self::INST
             | Self::ADDR => true,
             _ => false
