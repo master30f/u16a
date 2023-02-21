@@ -51,7 +51,7 @@ impl<'a> Lexer<'a> {
         Ok(Token::Comment(out))
     }
 
-    fn make_word(&mut self) -> Token {
+    fn make_word(&mut self) -> Result<Token, String> {
         let mut out = String::from(self.expect_current());
         
         while let Some(current) = self.advance() {
@@ -62,7 +62,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        Token::Word(out)
+        Token::try_from_word_string(&out)
     }
 
     fn make_instruction(&mut self) -> Result<Token, String> {
@@ -79,7 +79,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        Ok(Token::Instruction(u8::from_str_radix(out.as_str(), 2).map_err(|_| String::from("Invalid instruction"))?))
+        Ok(Token::Instruction(u16::from_str_radix(out.as_str(), 2).map_err(|_| String::from("Invalid instruction"))?))
     }
 
     fn make_arrow(&mut self) -> Result<Token, String> {
@@ -110,6 +110,7 @@ impl<'a> Iterator for Lexer<'a> {
                 '{' => self.advance_and(Token::LeftCurlyBrace),
                 '}' => self.advance_and(Token::RightCurlyBrace),
                 '&' => self.advance_and(Token::Ampersand),
+                '!' => self.advance_and(Token::Bang),
                 '/' => return Some(self.make_comment()),
                 '-' => return Some(self.make_arrow()),
                 _   => {
@@ -120,7 +121,7 @@ impl<'a> Iterator for Lexer<'a> {
                             Err(error) => return Some(Err(error))
                         }
                     } else if current.is_alphabetic() {
-                        self.make_word()
+                        return Some(self.make_word())
                     } else {
                         return self.advance_and(Some(Err(format!("Unknown symbol '{}'", current))))
                     }

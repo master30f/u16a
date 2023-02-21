@@ -1,50 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
-use crate::{parser::Parser, environment::{ByteSource, ByteSink, FlagMap, Statement, Action, WordIndex, Mode}};
+use crate::{environment::{Statement, Stream, Token}};
 
-#[derive(Debug)]
-struct Bus {
-    source: ByteSource,
-    sink: ByteSink
-}
-
-#[derive(Debug)]
-struct Microinstruction {
-    bus0: Option<Bus>,
-    bus1: Option<Bus>,
-    flags: FlagMap
-}
-
-impl From<(Option<Action>, FlagMap)> for Microinstruction {
-    fn from(other: (Option<Action>, FlagMap)) -> Self {
-        let action = other.0;
-        let flags = other.1;
-
-        let mut bus0: Option<Bus> = None;
-        let mut bus1: Option<Bus> = None;
-
-        match action {
-            Some(Action::OpenByteStream(source, sink)) => {
-                bus0 = Some(Bus { source, sink });
-            },
-            Some(Action::OpenWordStream(source, sink)) => {
-                let source0 = ByteSource::WordSlice(source.clone(), WordIndex::X);
-                let source1 = ByteSource::WordSlice(source.clone(), WordIndex::Y);
-
-                let sink0 = ByteSink::WordSlice(sink.clone(), WordIndex::X);
-                let sink1 = ByteSink::WordSlice(sink.clone(), WordIndex::Y);
-
-                bus0 = Some(Bus { source: source0, sink: sink0 });
-                bus1 = Some(Bus { source: source1, sink: sink1 });
-            },
-            None => ()
-        }
-
-        Self { bus0, bus1, flags }
-    }
-}
-
-type Channel = Vec<Microinstruction>;
+type Channel = Vec<u16>;
 
 #[derive(Debug)]
 struct Instruction {
@@ -52,51 +10,120 @@ struct Instruction {
 }
 
 pub struct Compiler {
-    statements: Vec<Statement>
+    alu_zero_ptr: u8,
+    alu_non_zero_ptr: u8,
+    out: HashMap<u16, u16>
 }
 
-impl Compiler {
-    pub fn new(statements: Vec<Statement>) -> Self {
-        Self { statements }
+fn make_micro_index(instruction_code: &u16, ptr: u8, alu_zero: bool) -> Result<u16, String> {
+    if ptr > 8 {
+        return Err(String::from("Pointer out of bounds"))
     }
 
-    fn compile_definition(byte_channel: &mut Channel, word_channel: &mut Channel, mode: &Mode, statements: &Vec<Statement>) {
-        for statement in statements {
-            match statement {
-                Statement::Action(action, flags) => {
-                    if mode.is_byte() {
-                        byte_channel.push(Microinstruction::from((action.clone(), flags.clone())));
-                    }
-                    if mode.is_word() {
-                        word_channel.push(Microinstruction::from((action.clone(), flags.clone())));
-                    }
-                },
-                Statement::Comment(_) => (),
-                Statement::Definition { instruction, mode, statements } => {
-                    Self::compile_definition(byte_channel, word_channel, mode, statements)
-                }
-            }
+    Ok((instruction_code << 8) | ((ptr as u16) << 1) | (alu_zero as u16))
+}
+
+fn action_to_microinstructions(stream: &Option<Stream>, flags: &Vec<Token>) -> u16 {
+    let mut out: u16 = 0;
+
+    for flag in flags {
+        out |= match flag {
+            Token::ZX => 0b00_000_000_000001_00,
+            Token::NX => 0b00_000_000_000010_00,
+            Token::ZY => 0b00_000_000_000100_00,
+            Token::NY => 0b00_000_000_001000_00,
+            Token::F  => 0b00_000_000_010000_00,
+            Token::NO => 0b00_000_000_100000_00,
+            Token::IC => 0b01_000_000_000000_00,
+            Token::EI => 0b10_000_000_000000_00,
+            _         => unreachable!()
         }
     }
 
-    pub fn compile(&mut self) -> Result<(), String> {
-        let mut instructions: HashMap<u8, Instruction> = HashMap::new();
+    if let Some(stream) = stream {
+        out |= (match stream.from {
+            Token::RAM => 1,
+            Token::IP  => 2,
+            Token::RX  => 3,
+            Token::RY  => 4,
+            Token::ALU => 5,
+            _          => unreachable!()
+        } << 8);
 
-        for statement in &self.statements {
+        out |= (match stream.to {
+            Token::ADDR => 1,
+            Token::INST => 2,
+            Token::IP   => 3,
+            Token::RX   => 4,
+            Token::RY   => 5,
+            Token::RAM  => 6,
+            _           => unreachable!()
+        } << 11);
+    }
+
+    return out;
+}
+
+impl Compiler {
+    pub fn new() -> Self {
+        Self {
+            alu_zero_ptr: 0,
+            alu_non_zero_ptr: 0,
+            out: HashMap::new()
+        }
+    }
+
+    fn compile_definition(&mut self, instruction_code: &u16, alu_zero: &Option<bool>, statements: &Vec<Statement>) -> Result<(), String> {
+        for statement in statements {
             match statement {
-                Statement::Definition { instruction: Some(instruction_code), mode, statements } => {
-                    let mut byte_channel = Channel::new();
-                    let mut word_channel = Channel::new();
+                Statement::Action { stream, flags } => {
+                    let inst = action_to_microinstructions(stream, flags);
 
-                    Self::compile_definition(&mut byte_channel, &mut word_channel, mode, statements);
-
-                    let instruction = Instruction {
-                        channels: vec![byte_channel, word_channel]
-                    };
-
-                    instructions.insert(instruction_code.clone(), instruction);
+                    match alu_zero {
+                        Some(true) => {
+                            self.out.insert(make_micro_index(instruction_code, self.alu_zero_ptr, true)?, inst);
+                            self.alu_zero_ptr += 1;
+                        }
+                        Some(false) => {
+                            self.out.insert(make_micro_index(instruction_code, self.alu_non_zero_ptr, false)?, inst);
+                            self.alu_non_zero_ptr += 1;
+                        }
+                        None => {
+                            self.out.insert(make_micro_index(instruction_code, self.alu_zero_ptr, true)?, inst);
+                            self.alu_zero_ptr += 1;
+                            self.out.insert(make_micro_index(instruction_code, self.alu_non_zero_ptr, false)?, inst);
+                            self.alu_non_zero_ptr += 1;
+                        }
+                    }
+                }
+                Statement::Definition { instruction: _, alu_zero, statements } => {
+                    self.compile_definition(instruction_code, alu_zero, statements)?;
                 },
-                Statement::Definition { instruction: _, mode: _, statements: _ } => {
+                Statement::Comment(_) => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn compile(&mut self, statements: Vec<Statement>) -> Result<(), String> {
+        for statement in &statements {
+            match statement {
+                Statement::Definition { instruction: Some(instruction_code), alu_zero: None, statements } => {
+                    let inst0 = action_to_microinstructions(&Some(Stream { from: Token::IP,  to: Token::ADDR }), &vec![]);
+                    let inst1 = action_to_microinstructions(&Some(Stream { from: Token::RAM, to: Token::INST }), &vec![Token::IC]);
+
+                    self.out.insert(make_micro_index(instruction_code, 0, false)?, inst0);
+                    self.out.insert(make_micro_index(instruction_code, 0, true)?, inst0);
+                    self.out.insert(make_micro_index(instruction_code, 1, false)?, inst1);
+                    self.out.insert(make_micro_index(instruction_code, 1, true)?, inst1);
+
+                    self.alu_zero_ptr = 2;
+                    self.alu_non_zero_ptr = 2;
+
+                    self.compile_definition(instruction_code, &None, statements)?;
+                },
+                Statement::Definition { instruction: _, alu_zero: _, statements: _ } => {
                     return Err(String::from("Definitions in the global scope must have an instruction defined."))
                 },
                 Statement::Comment(_) => (),
@@ -104,7 +131,34 @@ impl Compiler {
             }
         }
 
-        println!("{:?}", instructions);
+        let mut array: Vec<u16> = vec![0; 65536];
+
+        for (key, value) in &self.out {
+            array[key.clone() as usize] = value.clone();
+        }
+
+        let mut actual_out = String::from("addr/data: 16 16\n");
+
+        let mut amount: u32 = 0;
+        let mut prev_item: u16 = array[0];
+        for item in array {
+            if prev_item != item {
+                let mut add = if amount > 1 {
+                    format!("{}*", amount)
+                } else { String::new() };
+                add += &format!("{:x} ", prev_item);
+                actual_out += &add;
+                prev_item = item;
+                amount = 0;
+            }
+            amount += 1;
+        }
+        let mut add = if amount > 1 {
+            format!("{}*", amount)
+        } else { String::new() };
+        add += &format!("{:x}", prev_item);
+
+        println!("{}", actual_out);
 
         Ok(())
     }

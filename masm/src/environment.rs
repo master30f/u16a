@@ -1,9 +1,22 @@
-use std::collections::HashSet;
-
 #[derive(Debug, Clone)]
 pub enum Token {
-    Word(String),
-    Instruction(u8),
+    ZX,
+    NX,
+    ZY,
+    NY,
+    F,
+    NO,
+    IC,
+    EI,
+    RAM,
+    IP,
+    RX,
+    RY,
+    ALU,
+    ADDR,
+    INST,
+    AluZero,
+    Instruction(u16),
     Comment(String),
     LeftSquareBrace,
     RightSquareBrace,
@@ -11,192 +24,74 @@ pub enum Token {
     RightCurlyBrace,
     Arrow,
     Ampersand,
-    NewLine
+    NewLine,
+    Bang
 }
 
-#[derive(Debug, Clone)]
-pub enum WordIndex {
-    X,
-    Y
-}
-
-#[derive(Debug, Clone)]
-pub enum WordSource {
-    Arg0,
-    Arg1,
-    Ip
-}
-
-impl TryFrom<String> for WordSource {
-    type Error = ();
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Ok(match value.as_str() {
-            "arg0" => Self::Arg0,
-            "arg1" => Self::Arg1,
-            "ip" => Self::Ip,
-            _ => return Err(())
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum ByteSource {
-    WordSlice(WordSource, WordIndex),
-    Ram
-}
-
-impl TryFrom<String> for ByteSource {
-    type Error = ();
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Ok(match value.as_str() {
-            "ram" => Self::Ram,
-            _ => return Err(())
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum WordSink {
-    Addr,
-    Arg0,
-    Ip
-}
-
-impl TryFrom<String> for WordSink {
-    type Error = ();
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Ok(match value.as_str() {
-            "addr" => Self::Addr,
-            "arg0" => Self::Arg0,
-            "ip" => Self::Ip,
-            _ => return Err(())
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum ByteSink {
-    WordSlice(WordSink, WordIndex),
-    Inst,
-    Args
-}
-
-impl TryFrom<String> for ByteSink {
-    type Error = ();
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Ok(match value.as_str() {
-            "inst" => Self::Inst,
-            "args" => Self::Args,
-            _ => return Err(())
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Flag {
-    IC,
-    EI
-}
-
-#[derive(Debug, Clone)]
-pub struct FlagMap {
-    ic: bool,
-    ei: bool
-}
-
-impl From<Vec<Flag>> for FlagMap {
-    fn from(flags: Vec<Flag>) -> Self {
-        let mut ic = false;
-        let mut ei = false;
-
-        for flag in flags {
-            match flag {
-                Flag::IC => ic = true,
-                Flag::EI => ei = true
+impl Token {
+    pub fn try_from_word_string(word: &str) -> Result<Self, String> {
+        Ok(match word {
+            "zx"   => Token::ZX,
+            "nx"   => Token::NX,
+            "zy"   => Token::ZY,
+            "ny"   => Token::NY,
+            "f"    => Token::F,
+            "no"   => Token::NO,
+            "ic"   => Token::IC,
+            "ei"   => Token::EI,
+            "ram"  => Token::RAM,
+            "ip"   => Token::IP,
+            "rx"   => Token::RX,
+            "ry"   => Token::RY,
+            "alu"  => Token::ALU,
+            "addr" => Token::ADDR,
+            "inst" => Token::INST,
+            "alu_zero" => Token::AluZero,
+            _ => {
+                return Err(String::from("Invalid word"))
             }
+        })
+    }
+
+    pub fn is_source(&self) -> bool {
+        match self {
+            | Self::RAM
+            | Self::IP
+            | Self::RX
+            | Self::RY
+            | Self::ALU => true,
+            _ => false
         }
-
-        Self { ic, ei }
     }
-}
 
-impl TryFrom<String> for Flag {
-    type Error = ();
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Ok(match value.as_str() {
-            "ic" => Self::IC,
-            "ei" => Self::EI,
-            _ => return Err(())
-        })
-    }
-}
-
-#[derive(PartialEq, Eq, Hash)]
-pub enum ModeFlag {
-    Byte,
-    Word,
-}
-
-impl TryFrom<String> for ModeFlag {
-    type Error = ();
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Ok(match value.as_str() {
-            "byte" => Self::Byte,
-            "word" => Self::Word,
-            _ => return Err(())
-        })
+    pub fn is_sink(&self) -> bool {
+        match self {
+            | Self::RAM
+            | Self::IP
+            | Self::RX
+            | Self::RY
+            | Self::INST
+            | Self::ADDR => true,
+            _ => false
+        }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct Mode {
-    byte: bool,
-    word: bool,
-}
-
-impl Mode {
-    pub fn full() -> Self {
-        Self { byte: true, word: true }
-    }
-
-    pub fn is_byte(&self) -> bool { self.byte }
-    pub fn is_word(&self) -> bool { self.word }
-}
-
-impl From<HashSet<ModeFlag>> for Mode {
-    fn from(flags: HashSet<ModeFlag>) -> Self {
-        let mut byte = false;
-        let mut word = false;
-
-        for flag in flags {
-            match flag {
-                ModeFlag::Byte => byte = true,
-                ModeFlag::Word => word = true,
-            }
-        }
-
-        return Self { byte, word }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Action {
-    OpenWordStream(WordSource, WordSink),
-    OpenByteStream(ByteSource, ByteSink)
+pub struct Stream {
+    pub from: Token,
+    pub to: Token
 }
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    Action(Option<Action>, FlagMap),
+    Action {
+        stream: Option<Stream>,
+        flags: Vec<Token>
+    },
     Definition {
-        instruction: Option<u8>,
-        mode: Mode,
+        instruction: Option<u16>,
+        alu_zero: Option<bool>,
         statements: Vec<Statement>
     },
     Comment(String)

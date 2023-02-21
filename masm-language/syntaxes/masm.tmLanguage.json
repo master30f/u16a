@@ -30,23 +30,11 @@
 		},
 		"comment": {
 			"patterns": [{
-				"match": "^\\s*(\\/\\/\\s*)(?:(@(?:identifier|description|mode|static|arguments)\\s*(?:{([^}]*+)}))(.*)|([^@].*))$",
+				"match": "^\\s*(\\/\\/\\s*)(?:(@(?:identifier|description|syntax)\\s*(?:{([^}]*+)}))(.*)|([^@].*))$",
 				"captures": {
 					"1": { "name": "comment.line.double-slash.masm" },
 					"2": { "name": "keyword.other.annotation.masm" },
-					"3": {
-						"name": "string.masm",
-						"patterns": [
-							{
-								"name": "constant.language.bool.nasm",
-								"match": "(true|false)"
-							},
-							{
-								"name": "constant.numeric.decimal.nasm",
-								"match": "\\d+"
-							}
-						]
-					},
+					"3": { "name": "string.masm" },
 					"4": { "name": "comment.line.double-slash.masm" },
 					"5": { "name": "comment.line.double-slash.masm" }
 				}
@@ -55,12 +43,12 @@
 		"flag": {
 			"patterns": [{
 				"name": "entity.name.function.flag.masm",
-				"match": "\\b(ic|ei)\\b"
+				"match": "\\b(ic|ei|zx|nx|zy|ny|f|no)\\b"
 			}]
 		},
 		"stream": {
 			"patterns": [{
-				"match": "\\b(arg0|arg1|ip|ram)?\\b\\s*(->)\\s*\\b(addr|arg0|ip|inst|args)?\\b",
+				"match": "\\b(ip|ram|rx|ry|alu)?\\b\\s*(->)\\s*\\b(addr|inst|ip|rx|ry|ram)?\\b",
 				"captures": {
 					"1": { "name": "entity.name.class.source.masm" },
 					"2": { "name": "keyword.operator.stream.masm" },
@@ -72,7 +60,7 @@
 			"patterns": [
 				{
 					"name": "constant.language.mode.masm",
-					"match": "\\b(byte|word)\\b"
+					"match": "\\b(alu_zero)\\b"
 				}
 			]
 		},

@@ -1,8 +1,9 @@
 use masm::{lexer::Lexer, parser::Parser, compiler::Compiler};
-use std::fs;
+use std::{fs, path::Path};
 
 fn main() {
-    let content = fs::read_to_string("/home/zorby/src/u16a/masm/i.masm").unwrap();
+    let path = Path::new("./instructions.masm");
+    let content = fs::read_to_string(path).unwrap();
     //println!("{}", content);
 
     let lexer = Lexer::new(content.chars());
@@ -18,9 +19,9 @@ fn main() {
     match statements {
         Ok(statements) => {
             //println!("{:?}", statements)
-            let mut compiler = Compiler::new(statements);
+            let mut compiler = Compiler::new();
 
-            compiler.compile();
+            compiler.compile(statements);
         },
         Err(error) => println!("{}", error)
     }

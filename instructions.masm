@@ -1,0 +1,74 @@
+// @identifier  {NOOP}
+// @description {No-op}
+// @syntax      {nop}
+0000_0000 {
+    ei
+}
+
+// @identifier  {JUMP}
+// @description {Jumps to address $p}
+// @syntax      {jmp $p}
+0000_0001 {
+    ip -> addr
+    ram -> ip & ic
+    ei
+}
+
+// @identifier  {INCX}
+// @description {Increments value in register RX by one}
+// @syntax      {inc rx}
+0000_0010 {
+    alu -> rx & nx & zy & ny & f & no
+    ei
+}
+
+// @identifier  {DECX}
+// @description {Decrements value in register RX by one}
+// @syntax      {dec rx}
+0000_0011 {
+    alu -> rx & zy & ny & f
+    ei
+}
+
+// @identifier  {SETX}
+// @description {Sets the value in register RX to $p}
+// @syntax      {set rx,$p}
+0000_0100 {
+    ip -> addr
+    ram -> rx & ic
+    ei
+}
+
+// @identifier  {STRX}
+// @description {Stores the value in register RX to RAM on address $p}
+// @syntax      {str $p,rx}
+0000_0101 {
+    ip -> addr
+    ram -> addr & ic
+    rx -> ram
+    ei
+}
+
+// @identifier  {LDRX}
+// @description {Loads the value in RAM at address $p to register RX}
+// @syntax      {str $p,rx}
+0000_0110 {
+    ip -> addr
+    ram -> addr & ic
+    ram -> rx
+    ei
+}
+
+// @identifier  {JPZX}
+// @description {Jumps to address $p if the value in register RX is zero}
+// @syntax      {jpz rx}
+0000_0111 {
+    ip -> addr & zy & ny
+    [!alu_zero] {
+        ic & zy & ny
+    }
+    [alu_zero] {
+        ram -> ip & ic & zy & ny
+    }
+    ei
+}

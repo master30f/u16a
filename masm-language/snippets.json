@@ -4,9 +4,7 @@
         "body": [
             "// @identifier  {$1}",
             "// @description {$2}",
-            "// @mode        {$3}",
-            "// @static      {$4}",
-            "// @arguments   {$5}"
+            "// @syntax      {$3}"
         ]
     }
 }

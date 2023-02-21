@@ -1,7 +1,7 @@
 3 registers
 **IP** *Instruction pointer*
-**BX** *General purpose byte register X*
-**BY** *General purpose byte register Y*
+**RX** *General purpose byte register X*
+**RY** *General purpose byte register Y*
 
 0000 0000             **NOOP** *No-op*
 0000 0001  pppp pppp  **JUMP** *Puts value $p in register IP*

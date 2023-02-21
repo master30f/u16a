@@ -1,6 +1,4 @@
-use std::collections::HashSet;
-
-use crate::{environment::{Token, Statement, ModeFlag, Mode, Action, Flag, WordSource, WordSink, ByteSource, ByteSink, FlagMap}, lexer::Lexer};
+use crate::{environment::{Token, Statement, Stream}, lexer::Lexer};
 
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
@@ -47,36 +45,27 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn make_definition(&mut self, instruction: Option<u8>) -> Result<Statement, String> {
+    fn make_definition(&mut self, instruction: Option<u16>) -> Result<Statement, String> {
         let current = self.expect_current()?;
-        let mut mode_flags: HashSet<ModeFlag> = HashSet::new();
+        let mut alu_zero: Option<bool> = None;
         
         if let Token::LeftSquareBrace = current {
-            while let Some(token) = self.advance() {
-                if let Token::Word(value) = token? {
-                    let flag = ModeFlag::try_from(value).map_err(|_| String::from("Unknown mode flag"))?;
-                    
-                    if mode_flags.contains(&flag) {
-                        return Err(String::from("Duplicate mode flag"))
-                    }
-                    
-                    mode_flags.insert(flag);
-                    
-                    let token = self.advance().ok_or(String::from("Expected mode closure"))??;
-                    
-                    if let Token::Ampersand = token {
-                        continue;
-                    }
-                    
-                    if let Token::RightSquareBrace = token {
-                        self.advance();
-                        break;
-                    }
-                    
-                    return Err(String::from("Expected mode closure"))
+            let negate = if let Token::Bang = self.advance().ok_or(String::from("fdf"))?? {
+                self.advance();
+                false
+            } else {
+                true
+            };
+
+            if let Token::AluZero = self.expect_current()? {
+                if let Token::RightSquareBrace = self.advance().ok_or(String::from("AAA"))?? {
+                    alu_zero = Some(negate);
+                    self.advance();
                 } else {
-                    return Err(String::from("Expected mode flag"))
+                    return Err(String::from("Expected mode closure"))
                 }
+            } else {
+                return Err(String::from("Expected 'alu_zero'"))
             }
         }
         
@@ -105,66 +94,51 @@ impl<'a> Parser<'a> {
 
         if !brace_found { return Err(String::from("Expected definition closure")) }
 
-        let mode = if mode_flags.len() == 0 {
-            Mode::full()
-        } else {
-            Mode::from(mode_flags)
-        };
-
-        Ok(Statement::Definition { instruction, mode, statements })
+        Ok(Statement::Definition { instruction, alu_zero, statements })
     }
     
-    fn make_action_compound(&mut self, action: &mut Option<Action>, flags: &mut Vec<Flag>) -> Result<(), String> {
-        let token = self.current.clone().ok_or(String::from("Invalid syntax"))??;
-        if let Token::Word(first) = token {
-            match self.advance() {
-                Some(Ok(Token::Arrow)) => {
-                    match self.advance() {
-                        Some(Ok(Token::Word(second))) => {
-                            //println!("OpenStream\n Source: {:?}\n Sink: {:?}", &first, &second);
-                            match WordSource::try_from(first.clone()) {
-                                Ok(source) => {
-                                    let sink = WordSink::try_from(second).map_err(|_| String::from("Invalid sink"))?;
-                                    *action = Some(Action::OpenWordStream(source, sink));
-                                },
-                                Err(_) => {
-                                    let source = ByteSource::try_from(first).map_err(|_| String::from("Invalid source"))?;
-                                    let sink = ByteSink::try_from(second).map_err(|_| String::from("Invalid sink"))?;
-                                    *action = Some(Action::OpenByteStream(source, sink));
-                                }
-                            }
-                            self.advance();
-                            Ok(())
-                        }
-                        _ => {
-                            Err(String::from("Expected sink"))
-                        }
-                    }
+    fn make_action_compound(&mut self, stream: &mut Option<Stream>, flags: &mut Vec<Token>) -> Result<(), String> {
+        let first = self.current.clone().ok_or(String::from("Invalid syntax"))??;
+
+        match self.advance() {
+            Some(Ok(Token::Arrow)) => {
+                self.advance();
+
+                let second = self.current.clone().ok_or(String::from("Invalid syntax"))??;
+                        
+                if !first.is_source() {
+                    return Err(String::from("Invalid syntax"))
                 }
-                None | Some(Ok(Token::NewLine | Token::Ampersand)) => {
-                    flags.push(Flag::try_from(first).map_err(|_| String::from("Invalid flag"))?);
-                    Ok(())
+
+                if !second.is_sink() {
+                    return Err(String::from("Expected sink"))
                 }
-                Some(Err(error)) => Err(error),
-                Some(Ok(token)) => {
-                    //println!("{:?}", token);
-                    Err(String::from("Invalid syntax"))
-                }
+
+                *stream = Some(Stream { from: first, to: second });
+
+                self.advance();
+                Ok(())
             }
-        } else {
-            Err(String::from("Invalid syntax"))
+            None | Some(Ok(Token::NewLine | Token::Ampersand)) => {
+                flags.push(first);
+                Ok(())
+            }
+            Some(Err(error)) => Err(error),
+            Some(Ok(token)) => {
+                Err(String::from("Invalid syntax"))
+            }
         }
     }
 
     fn make_action(&mut self) -> Result<Statement, String> {
-        let mut action: Option<Action> = None;
-        let mut flags: Vec<Flag> = Vec::new();
+        let mut stream: Option<Stream> = None;
+        let mut flags: Vec<Token> = Vec::new();
 
         loop {
-            self.make_action_compound(&mut action, &mut flags)?;
+            self.make_action_compound(&mut stream, &mut flags)?;
             //println!("In make_action loop\n Current: {:?}", &self.current);
             match &self.current {
-                Some(Ok(Token::NewLine)) | None => return Ok(Statement::Action(action, FlagMap::from(flags))),
+                Some(Ok(Token::NewLine)) | None => return Ok(Statement::Action { stream, flags }),
                 Some(Ok(Token::Ampersand)) => { self.advance(); },
                 Some(Err(error)) => return Err(error.clone()),
                 _token => {
@@ -185,11 +159,7 @@ impl<'a> Parser<'a> {
             },
             Token::Comment(comment) => self.advance_and(Ok(Statement::Comment(comment))),
             Token::LeftSquareBrace => self.make_definition(None),
-            Token::Word(_) => self.make_action(),
-            _ => {
-                //println!("{:?}", &token);
-                Err(String::from("Expected statement"))
-            }
+            _ => self.make_action()
         }?;
 
         //println!("{:?}", &self.current);
