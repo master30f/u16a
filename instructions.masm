@@ -72,3 +72,158 @@
     }
     ei
 }
+
+// @identifier  {INCY}
+// @description {Increments value in register RY by one}
+// @syntax      {inc ry}
+0000_1000 {
+    alu -> ry & zx & nx & ny & f & no
+    ei
+}
+
+// @identifier  {DECY}
+// @description {Decrements value in register RY by one}
+// @syntax      {dec ry}
+0000_1001 {
+    alu -> ry & zx & nx & f
+    ei
+}
+
+// @identifier  {SETY}
+// @description {Sets the value in register RY to $p}
+// @syntax      {set ry,$p}
+0000_1010 {
+    ip -> addr
+    ram -> ry & ic
+    ei
+}
+
+// @identifier  {STRY}
+// @description {Stores the value in register RY to RAM on address $p}
+// @syntax      {str $p,ry}
+0000_1011 {
+    ip -> addr
+    ram -> addr & ic
+    ry -> ram
+    ei
+}
+
+// @identifier  {LDRY}
+// @description {Loads the value in RAM at address $p to register RY}
+// @syntax      {str $p,ry}
+0000_1100 {
+    ip -> addr
+    ram -> addr & ic
+    ram -> ry
+    ei
+}
+
+// @identifier  {JPZY}
+// @description {Jumps to address $p if the value in register RY is zero}
+// @syntax      {jpz ry}
+0000_1101 {
+    ip -> addr & zx & nx
+    [!alu_zero] {
+        ic & zx & nx
+    }
+    [alu_zero] {
+        ram -> ip & ic & zx & nx
+    }
+    ei
+}
+
+// @identifier  {CPXY}
+// @description {}
+// @syntax      {cpy ry,rx}
+0000_1110 {
+    rx -> ry
+    ei
+}
+
+// @identifier  {CPYX}
+// @description {}
+// @syntax      {cpy rx,ry}
+0000_1111 {
+    ry -> rx
+    ei
+}
+
+// @identifier  {CPXZ}
+// @description {}
+// @syntax      {cpy rz,rx}
+0001_0000 {
+    rx -> rz
+    ei
+}
+
+// @identifier  {CPYZ}
+// @description {}
+// @syntax      {cpy rz,ry}
+0001_0001 {
+    ry -> rz
+    ei
+}
+
+// @identifier  {CPZX}
+// @description {}
+// @syntax      {cpy rx,rz}
+0001_0010 {
+    rz -> rx
+    ei
+}
+
+// @identifier  {CPZY}
+// @description {}
+// @syntax      {cpy ry,rz}
+0001_0011 {
+    rz -> ry
+    ei
+}
+
+// @identifier  {ADDX}
+// @description {}
+// @syntax      {addx rx,ry}
+0001_0100 {
+    alu -> rx & f
+    ei
+}
+
+// @identifier  {ADDY}
+// @description {}
+// @syntax      {addy ry,rx}
+0001_0101 {
+    alu -> ry & f
+    ei
+}
+
+// @identifier  {SBXY}
+// @description {}
+// @syntax      {sub rx,ry}
+0001_0110 {
+    alu -> rx & nx & f & no
+    ei
+}
+
+// @identifier  {SBYX}
+// @description {}
+// @syntax      {sub ry,rx}
+0001_0111 {
+    alu -> ry & ny & f & no
+    ei
+}
+
+// @identifier  {OR}
+// @description {}
+// @syntax      {or rx,ry}
+0001_1000 {
+    alu -> rx & ny & f & no
+    ei
+}
+
+// @identifier  {AND}
+// @description {}
+// @syntax      {and rx,ry}
+0001_1001 {
+    alu -> rx & nx & ny & no
+    ei
+}
